@@ -4,9 +4,16 @@ import (
 	"fmt"
 	"github.com/kardianos/service"
 	"os"
+	"time"
 )
 
-type SystemService struct{}
+type SystemService struct {
+	exit chan struct{}
+}
+
+func NewSystemService() service.Interface {
+	return &SystemService{exit: make(chan struct{}, 1)}
+}
 
 func (ss *SystemService) Start(s service.Service) error {
 	fmt.Println("coming Start.......")
@@ -15,11 +22,20 @@ func (ss *SystemService) Start(s service.Service) error {
 }
 
 func (ss *SystemService) run() {
-	fmt.Println("coming run.......")
+	ticker := time.NewTicker(time.Second)
+	for {
+		select {
+		case <-ticker.C:
+			fmt.Printf("%s: running\n", time.Now().Format(time.DateTime))
+		case <-ss.exit:
+			return
+		}
+	}
 }
 
 func (ss *SystemService) Stop(s service.Service) error {
 	fmt.Println("coming Stop.......")
+	ss.exit <- struct{}{}
 	return nil
 }
 
@@ -34,15 +50,13 @@ func (ss *SystemService) Stop(s service.Service) error {
 // systemctl start custom-service
 // systemctl stop custom-service
 func main() {
-	fmt.Println("service.Interactive()---->", service.Interactive())
 	svcConfig := &service.Config{
 		Name:        "custom-service",
 		DisplayName: "custom service",
 		Description: "this is github.com/kardianos/service test case",
 	}
 
-	ss := &SystemService{}
-	s, err := service.New(ss, svcConfig)
+	s, err := service.New(NewSystemService(), svcConfig)
 	if err != nil {
 		fmt.Printf("service New failed, err: %v\n", err)
 		os.Exit(1)
