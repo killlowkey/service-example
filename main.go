@@ -35,7 +35,9 @@ func (ss *SystemService) run() {
 
 func (ss *SystemService) Stop(s service.Service) error {
 	fmt.Println("coming Stop.......")
-	ss.exit <- struct{}{}
+	if service.Interactive() {
+		ss.exit <- struct{}{}
+	}
 	return nil
 }
 
@@ -54,6 +56,12 @@ func main() {
 		Name:        "custom-service",
 		DisplayName: "custom service",
 		Description: "this is github.com/kardianos/service test case",
+		EnvVars: map[string]string{
+			"LD_LIBRARY_PATH": fmt.Sprintf("%s:${LD_LIBRARY_PATH}", "1"),
+		},
+		Option: map[string]interface{}{
+			"Restart": "always",
+		},
 	}
 
 	s, err := service.New(NewSystemService(), svcConfig)
@@ -62,7 +70,17 @@ func main() {
 		os.Exit(1)
 	}
 
-	if len(os.Args) > 1 {
+	matcher := func(str string) bool {
+		for _, action := range service.ControlAction {
+			if action == str {
+				return true
+			}
+		}
+		return false
+	}
+
+	// install、uninstall、start、stop、restart
+	if len(os.Args) > 1 && matcher(os.Args[1]) {
 		if err = service.Control(s, os.Args[1]); err != nil {
 			fmt.Printf("service Control failed, err: %v\n", err)
 			os.Exit(1)
